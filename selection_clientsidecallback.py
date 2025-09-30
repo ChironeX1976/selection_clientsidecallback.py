@@ -92,8 +92,12 @@ app.clientside_callback(
         // Zoek het label dat hoort bij de geselecteerde blob-url
         const match = options.find(opt => opt.value === selectedAudioUrl);
         const label = match ? match.label : "";
-
-        return [selectedAudioUrl, label];
+        // label must be iso 8601 format
+        let isotimelabel=label;
+        if (label.includes(" ")){
+        isotimelabel = label.replace(" ", "T");
+        }
+        return [selectedAudioUrl, isotimelabel];
     }
     """,
     [Output("cl_audioplayer", "src"),
