@@ -3,6 +3,7 @@ import datetime
 o_datetime = datetime.datetime.strptime('1976-07-02 23:30:00', '%Y-%m-%d %H:%M:%S')
 
 app = Dash()
+server=app.server # <-- belangrijk voor deployment
 app.layout = html.Div([
     dcc.Store(id='cl_allowed_audiofiles_store', data=''),
     html.Button(id='cl_btn_loaddata_into_dccstore', children='Load Data', n_clicks=0),
