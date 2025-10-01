@@ -6,15 +6,16 @@ app = Dash()
 server=app.server # <-- belangrijk voor deployment
 app.layout = html.Div([
     dcc.Store(id='cl_allowed_audiofiles_store', data=''),
+html.Div([html.Div(id='cl_audio_loudness_label', children='Audio loudness (if any audio) for this session is default'),
+    dcc.Dropdown(id="cl_audio_loudness", options=[1, 2, 5, 10, 20], clearable=False, value=2, style={'width': 'fit-content'}),
+    html.P(id="cl_loudness_locked_msg", style={"color": "gray"})], style={'display': 'flex','alignItems': 'center', 'gap': '10px'}),
     html.Button(id='cl_btn_loaddata_into_dccstore', children='Load Data', n_clicks=0),
-    html.Button(id='cl_btn_select_audiofolder', children="Kies map", n_clicks=0),
+    html.Button(id='cl_btn_select_audiofolder', children="Choose folder with audio-files", n_clicks=0),
     dcc.Dropdown(id="cl_drp_audiofilelist", placeholder="Selecteer een audio-bestand"),
     html.P(id="cl_audio_errormessage", style={"color": "red"}),
-    html.Audio(id="cl_audioplayer", controls=True),
-    #html.Div(id="js_trigger_audiofiles_are_in_store", **{"data-files": ""}),
+        html.Audio(id="cl_audioplayer", controls=True),
     html.Div(id="cl_begintime", children=o_datetime),
     html.Div(id="cl_ann", children='no audiofile loaded'),
-    dcc.Input(id="cl_hidden_selected_label", type="text", value="", style={"display": "none"}),
     html.Div(id="cl_debug_selected_label", children = "cl_debug_selected_label: hier komt debuginfo van geselecteerde label"),
     html.Div(id="cl_debug_raw_message", children = "cl_debug_raw_message: hier komt debuginfo van raw message"),
     html.Div(id="cl_debug_dcc_filled", children = "dccstore empty"),
@@ -40,6 +41,19 @@ def update_output(n_clicks):
 )
 def update_output(data):
     return "er zijn audiolijst-gegevens ingeladen"
+
+@app.callback(
+    [Output("cl_audio_loudness", "disabled"),
+     Output("cl_loudness_locked_msg", "children")],
+    [Input("cl_audio_loudness", "value"),
+     Input("cl_btn_loaddata_into_dccstore", "n_clicks")],
+    prevent_initial_call=True
+)
+def lock_loudness_dropdown(value, n_clicks):
+    if value is not None or n_clicks > 0:
+        return True, f"Loudness is locked at x{value}. Reload the page to change this."
+    return False, ""
+
 
 app.clientside_callback(
     """
@@ -146,5 +160,33 @@ app.clientside_callback(
     Input('cl_begintime', 'children'),
     Input('cl_interval', 'n_intervals'),  # every dcc.interval a new value is taken from audio component
 )
+app.clientside_callback(
+    """
+    function(selectedAudioUrl, loudnessFactor) {
+        const audioElement = document.getElementById("cl_audioplayer");
+        if (!audioElement || !selectedAudioUrl) return;
+
+        // Initieer audio context en nodes éénmalig via window
+        if (!window.audioCtx) {
+            window.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            window.sourceNode = window.audioCtx.createMediaElementSource(audioElement);
+            window.gainNode = window.audioCtx.createGain();
+            window.gainNode.gain.value = parseFloat(loudnessFactor);
+            window.sourceNode.connect(window.gainNode).connect(window.audioCtx.destination);
+            window.isConnected = true;
+        }
+
+        // Stel nieuwe bron in en speel af
+        audioElement.src = selectedAudioUrl;
+        audioElement.play();
+
+        return null;
+    }
+    """,
+    Output("cl_debug_selected_label", "children"),  # Dummy output
+    Input("cl_drp_audiofilelist", "value"),
+    State("cl_audio_loudness", "value")
+)
+
 if __name__ == '__main__':
     app.run(debug=True)
